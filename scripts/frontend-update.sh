@@ -21,7 +21,7 @@ git pull
 echo "--- Building React Frontend Production Bundle ---"
 cd "$PROJECT_ROOT/frontend"
 npm install
-npm run build
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 echo "--- Copying built assets to Nginx web root ---"
 mkdir -p /var/www/smartgrid/html

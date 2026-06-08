@@ -30,7 +30,7 @@ cd "$PROJECT_ROOT/frontend"
 
 # Build production distribution
 npm install
-npm run build
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # 4. Provision assets to Nginx Root
 echo "--- Copying built assets to Nginx web root ---"
