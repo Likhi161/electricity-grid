@@ -4,15 +4,17 @@ This guide details the step-by-step procedure to deploy the production-ready **S
 
 ---
 
-## SECTION 0 – ARCHITECTURE OVERVIEW
+### SECTION 0 – ARCHITECTURE OVERVIEW
 
-The application is built on a decoupled, three-tier microservices architecture:
+The application is built on a decoupled, cloud-integrated three-tier microservices architecture:
 
 ```mermaid
 graph TD
+    User[Web Browser] -->|HTTP / Port 80| ALB[Application Load Balancer]
+    
     subgraph Server 3: Frontend Server
-        Nginx[Nginx Reverse Proxy / Port 80]
-        React[React Client / Port 80]
+        Nginx[Nginx Static Server / Port 80]
+        React[React Client]
     end
 
     subgraph Server 2: Backend Server
@@ -28,24 +30,32 @@ graph TD
         MySQL[MySQL Server / Port 3306]
     end
 
-    Nginx -->|Serves Static Files| React
-    React -->|HTTP / Relative Path| Nginx
-    Nginx -->|Reverse Proxy / Port 3001| Auth
-    Nginx -->|Reverse Proxy / Port 3002| Consumer
-    Nginx -->|Reverse Proxy / Port 3003| Meter
-    Nginx -->|Reverse Proxy / Port 3004| Billing
-    Nginx -->|Reverse Proxy / Port 3005| Alert
+    subgraph AWS Cloud Services
+        SM[Secrets Manager]
+        S3[S3 Bills Bucket]
+    end
 
-    Auth -->|Shared Database Access| MySQL
-    Consumer -->|Shared Database Access| MySQL
-    Meter -->|Shared Database Access| MySQL
-    Billing -->|Shared Database Access| MySQL
-    Alert -->|Shared Database Access| MySQL
+    ALB -->|Default Routing / Port 80| Nginx
+    Nginx -->|Serves Static Assets| React
+
+    ALB -->|Path Routing /api/auth| Auth
+    ALB -->|Path Routing /api/consumers| Consumer
+    ALB -->|Path Routing /api/meters| Meter
+    ALB -->|Path Routing /api/bills| Billing
+    ALB -->|Path Routing /api/alerts| Alert
+
+    Auth & Consumer & Meter & Billing & Alert -->|Dynamic Credentials| SM
+    Billing -->|Store & Retrieve HTML Statements| S3
+    
+    Auth & Consumer & Meter & Billing & Alert -->|Shared Database Access| MySQL
 ```
 
 ### Communication Flow & Ports
-1. **Frontend → Backend**: The React client communicates with the Nginx Web Server on the Frontend Server via HTTP (Port 80). Nginx acts as a reverse proxy, routing requests to Server 2 (Backend Server) on Private IP Ports `3001` through `3005` based on sub-routes.
-2. **Backend → Database**: Backend microservices connect to Server 1 (Database Server) on Port `3306` using Private IPs.
+1. **Frontend & ALB Routing**: The user hits the Application Load Balancer DNS endpoint on Port 80.
+   - Default traffic (`/*`) is routed to the Frontend Server (Port 80), where Nginx serves the React static assets.
+   - API traffic (`/api/*`) is routed dynamically by path matching directly to individual microservices on Ports `3001` through `3005` on the Backend Server.
+2. **Cloud Service Access**: Microservices fetch database connection strings, JWT secrets, and SMTP settings dynamically from AWS Secrets Manager using an IAM Instance Profile. The Billing Service uploads and downloads statement files directly to/from S3.
+3. **Backend → Database**: Backend microservices connect to Server 1 (Database Server) on Port `3306` using Private IPs retrieved from Secrets Manager.
 
 ---
 
@@ -158,18 +168,31 @@ chmod +x scripts/backend-install.sh
 sudo ./scripts/backend-install.sh
 ```
 
-### Step 4.3: Interactive Setup Prompts
-The script will ask for:
-1. `Enter Database Private IP [127.0.0.1]:` Enter the **Private IP of Server 1**.
-2. `Enter Database Port [3306]:` Press Enter.
-3. `Enter Database Name [smartgrid]:` Enter the database name chosen in Section 3.
-4. `Enter Database User [smartgrid_user]:` Enter the username configured in Section 3.
-5. `Enter Database Password [password]:` Enter the database password configured in Section 3.
-6. `Enter SMTP Host [smtp.mailtrap.io]:` Enter SMTP server address (or press Enter).
-7. `Enter SMTP Port [2525]:` Enter SMTP port (or press Enter).
-8. `Enter SMTP Username:` Enter SMTP Username (or leave blank to simulate mail logs in console).
-9. `Enter SMTP Password:` Enter SMTP Password (or leave blank).
-10. `Enter Sender Email [noreply@smartgrid.com]:` Enter sender address.
+### Step 4.3: Cloud Secrets Manager Setup
+The backend microservices automatically read connection strings, SMTP settings, database credentials, and the JWT secret directly from AWS Secrets Manager using the attached IAM instance profile (role configured via Terraform).
+
+If you are running the setup script `scripts/backend-install.sh`, it will generate fallback `.env` files, which are useful for local testing or if the AWS Secrets Manager service cannot be reached. However, in production, the application will prioritize Secrets Manager variables.
+
+Ensure the AWS Secrets Manager Secret `smartgrid/config` is populated in your AWS Account before starting the services. The secret JSON should look like:
+```json
+{
+  "NODE_ENV": "production",
+  "DB_HOST": "YOUR_DATABASE_PRIVATE_IP",
+  "DB_PORT": "3306",
+  "DB_USER": "smartgrid_user",
+  "DB_PASSWORD": "your_secure_password",
+  "DB_NAME": "smartgrid",
+  "JWT_SECRET": "your_jwt_signing_secret_key",
+  "SMTP_HOST": "smtp.mailtrap.io",
+  "SMTP_PORT": "2525",
+  "SMTP_USER": "",
+  "SMTP_PASS": "",
+  "SENDER_EMAIL": "noreply@smartgrid.com",
+  "S3_BUCKET_NAME": "YOUR_S3_BILLS_BUCKET_NAME",
+  "AWS_REGION": "ap-south-1"
+}
+```
+*(Terraform automatically provisions and populates this secret with the correct database private IP and S3 bucket name during deployment!)*
 
 ### Step 4.4: Administrator Interactive Bootstrapping
 During execution, the script will run `admin-bootstrap.js` which prompts you to create the initial administrative account:
@@ -246,7 +269,7 @@ Expected output: Returns React HTML boilerplate with title containing `SmartGrid
 
 ## SECTION 6 – FIRST LOGIN
 
-1. Open your web browser and navigate to: `http://YOUR_FRONTEND_SERVER_PUBLIC_IP`
+1. Open your web browser and navigate to: `http://YOUR_ALB_DNS_NAME`
 2. You will be redirected to the `/login` page.
 3. Login using the **Admin credentials** configured in **Step 4.4**.
 4. Upon successful validation, you will be routed to the `/admin` Super Admin dashboard.
@@ -261,7 +284,7 @@ Expected output: Returns React HTML boilerplate with title containing `SmartGrid
 Follow this sequence to test end-to-end features on your new deploy:
 
 ### Test 7.1: Register a Consumer
-1. Logout of Admin and go to `http://YOUR_FRONTEND_SERVER_PUBLIC_IP/register`.
+1. Logout of Admin and go to `http://YOUR_ALB_DNS_NAME/register`.
 2. Register a consumer (Name: John Doe, Email: `john@doe.com`, Address: 123 Power Street).
 3. **Expected Result**: Success alert appears, and user is redirected to login. A consumer profile with status `CONNECTED` and balance `$0.00` is initialized in the DB.
 

@@ -1,6 +1,6 @@
 const readline = require('readline');
 const bcrypt = require('bcryptjs');
-const { User } = require('./models');
+const { loadSecrets } = require('./secrets-manager');
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -10,6 +10,9 @@ const rl = readline.createInterface({
 const askQuestion = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 async function bootstrapAdmin() {
+  await loadSecrets();
+  const { User } = require('./models');
+  
   console.log('\n--- SmartGrid Admin Bootstrapper ---');
   
   let name = process.env.ADMIN_NAME;

@@ -17,11 +17,8 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 
-// Ensure storage folder for bills exists
-const billsDir = path.join(__dirname, '../../storage/bills');
-if (!fs.existsSync(billsDir)) {
-  fs.mkdirSync(billsDir, { recursive: true });
-}
+// S3 helper for invoice management (with local fallback)
+const { uploadBill, downloadBill } = require('../../shared/database/s3-helper');
 
 // Custom Rate Limiter
 const rateLimitMap = new Map();
@@ -285,7 +282,6 @@ app.post('/api/bills/generate', authenticate, authorize(['STAFF', 'ADMIN']), asy
 
     // 5. Build HTML file representing the receipt/bill
     const fileName = `bill_${consumer.consumer_number}_${billingMonth}.html`;
-    const filePath = path.join(billsDir, fileName);
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -363,7 +359,7 @@ app.post('/api/bills/generate', authenticate, authorize(['STAFF', 'ADMIN']), asy
     </html>
     `;
 
-    fs.writeFileSync(filePath, htmlContent, 'utf8');
+    await uploadBill(fileName, htmlContent);
 
     // 6. Save Bill record in DB
     const bill = await Bill.create({
@@ -409,15 +405,11 @@ app.get('/api/bills/:id/download', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized to download this statement' });
     }
 
-    const filePath = path.join(billsDir, bill.pdf_path);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Physical receipt file not found on disk' });
+    try {
+      return await downloadBill(bill.pdf_path, res);
+    } catch (err) {
+      return res.status(404).json({ error: 'Physical receipt file not found in storage' });
     }
-
-    // Set download headers
-    res.setHeader('Content-Disposition', `attachment; filename=${bill.pdf_path}`);
-    res.setHeader('Content-Type', 'text/html'); // Serving as HTML invoice, browser will download or open
-    return res.sendFile(filePath);
   } catch (error) {
     console.error('Download Bill Error:', error);
     return res.status(500).json({ error: 'Internal server error' });

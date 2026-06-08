@@ -34,6 +34,7 @@ resource "aws_instance" "backend" {
   subnet_id              = aws_subnet.private_app_a.id
   vpc_security_group_ids = [aws_security_group.backend_sg.id]
   key_name               = "Likhitha-pem"
+  iam_instance_profile   = aws_iam_instance_profile.backend_profile.name
 
   tags = {
     Name = "smartgrid-backend"

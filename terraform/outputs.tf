@@ -26,3 +26,8 @@ output "database_private_ip" {
   value       = aws_instance.database.private_ip
   description = "Private IP address of the Database Server"
 }
+
+output "alb_dns_name" {
+  value       = aws_lb.smartgrid_alb.dns_name
+  description = "The DNS name of the Application Load Balancer"
+}

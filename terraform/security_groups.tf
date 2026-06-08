@@ -28,17 +28,17 @@ resource "aws_security_group" "frontend_sg" {
   vpc_id = aws_vpc.smartgrid_vpc.id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   ingress {
@@ -72,7 +72,7 @@ resource "aws_security_group" "backend_sg" {
     from_port       = 3001
     to_port         = 3005
     protocol        = "tcp"
-    security_groups = [aws_security_group.frontend_sg.id]
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   egress {
