@@ -58,7 +58,7 @@ const SupervisorDashboard = () => {
       setInspections(Array.isArray(insRes.data) ? insRes.data : []);
 
       // Fetch users to filter STAFF & SUPERVISORS
-      const usersRes = await authApi.get('/users');
+      const usersRes = await authApi.get('/auth/users');
       console.log('[DEBUG] SupervisorDashboard Users Response:', usersRes.data);
       const userData = Array.isArray(usersRes.data) ? usersRes.data : [];
       const filteredStaff = userData.filter(u => u?.role === 'STAFF' || u?.role === 'SUPERVISOR');

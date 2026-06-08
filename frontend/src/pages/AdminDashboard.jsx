@@ -60,7 +60,7 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const uRes = await authApi.get('/users');
+      const uRes = await authApi.get('/auth/users');
       console.log('[DEBUG] AdminDashboard Users Response:', uRes.data);
       setUsers(Array.isArray(uRes.data) ? uRes.data : []);
 
@@ -135,7 +135,7 @@ const AdminDashboard = () => {
       if (editUserData.password) {
         updatePayload.password = editUserData.password;
       }
-      await authApi.put(`/users/${editUserData.id}`, updatePayload);
+      await authApi.put(`/auth/users/${editUserData.id}`, updatePayload);
       setSuccess('User updated successfully!');
       fetchData();
       setTimeout(() => {
