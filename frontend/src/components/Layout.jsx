@@ -46,9 +46,15 @@ const Layout = ({ children }) => {
       } else {
         res = await alertApi.get('/alerts');
       }
-      setNotifications(res.data || []);
+      const data = res.data;
+      console.log('[DEBUG] Layout Notifications Response:', data);
+      const alerts = Array.isArray(data)
+        ? data
+        : (data && Array.isArray(data.data) ? data.data : []);
+      setNotifications(alerts);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setNotifications([]);
     }
   };
 
@@ -126,7 +132,7 @@ const Layout = ({ children }) => {
 
               {/* Notifications Icon */}
               <IconButton color="inherit" onClick={handleNotificationsOpen}>
-                <Badge badgeContent={notifications.length} color="secondary">
+                <Badge badgeContent={Array.isArray(notifications) ? notifications.length : 0} color="secondary">
                   <NotificationsIcon />
                 </Badge>
               </IconButton>
@@ -146,10 +152,10 @@ const Layout = ({ children }) => {
                 }}
               >
                 <Typography variant="subtitle2" sx={{ px: 2, py: 1, color: '#26C6DA', fontWeight: 600 }}>
-                  Notifications ({notifications.length})
+                  Notifications ({Array.isArray(notifications) ? notifications.length : 0})
                 </Typography>
                 <Divider sx={{ backgroundColor: 'rgba(0, 183, 194, 0.15)' }} />
-                {notifications.length === 0 ? (
+                {!Array.isArray(notifications) || notifications.length === 0 ? (
                   <MenuItem onClick={handleNotificationsClose}>
                     <Typography variant="body2" sx={{ color: '#B0BEC5', py: 1 }}>No new alerts</Typography>
                   </MenuItem>
