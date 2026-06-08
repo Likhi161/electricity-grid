@@ -27,7 +27,8 @@ import {
   ListItem,
   ListItemText,
   Divider,
-  CircularProgress
+  CircularProgress,
+  IconButton
 } from '@mui/material';
 import {
   AccountBalanceWallet as WalletIcon,
