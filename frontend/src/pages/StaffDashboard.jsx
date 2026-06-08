@@ -67,21 +67,26 @@ const StaffDashboard = () => {
     setLoading(true);
     try {
       const cRes = await consumerApi.get('/consumers');
-      setConsumers(cRes.data || []);
+      console.log('[DEBUG] StaffDashboard Consumers Response:', cRes.data);
+      setConsumers(Array.isArray(cRes.data) ? cRes.data : []);
       
       const mRes = await meterApi.get('/meters');
-      setMeters(mRes.data || []);
+      console.log('[DEBUG] StaffDashboard Meters Response:', mRes.data);
+      setMeters(Array.isArray(mRes.data) ? mRes.data : []);
       
       const bRes = await billingApi.get('/bills');
-      setBills(bRes.data || []);
+      console.log('[DEBUG] StaffDashboard Bills Response:', bRes.data);
+      setBills(Array.isArray(bRes.data) ? bRes.data : []);
       
       const rRes = await billingApi.get('/recharges');
-      setRecharges(rRes.data || []);
+      console.log('[DEBUG] StaffDashboard Recharges Response:', rRes.data);
+      setRecharges(Array.isArray(rRes.data) ? rRes.data : []);
 
       const tRes = await billingApi.get('/tariffs');
-      setTariffs(tRes.data || []);
+      console.log('[DEBUG] StaffDashboard Tariffs Response:', tRes.data);
+      setTariffs(Array.isArray(tRes.data) ? tRes.data : []);
     } catch (err) {
-      console.error(err);
+      console.error('[ERROR] StaffDashboard fetchData error:', err);
       setError('Failed to fetch platform records.');
     } finally {
       setLoading(false);
@@ -279,19 +284,19 @@ const StaffDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {consumers.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell>{c.id}</TableCell>
-                    <TableCell><strong>{c.consumer_number}</strong></TableCell>
-                    <TableCell>{c.user?.name}</TableCell>
-                    <TableCell>{c.user?.email}</TableCell>
-                    <TableCell>{c.phone}</TableCell>
-                    <TableCell>{c.address}</TableCell>
+                {(Array.isArray(consumers) ? consumers : []).map((c) => (
+                  <TableRow key={c?.id}>
+                    <TableCell>{c?.id}</TableCell>
+                    <TableCell><strong>{c?.consumer_number}</strong></TableCell>
+                    <TableCell>{c?.user?.name || '-'}</TableCell>
+                    <TableCell>{c?.user?.email || '-'}</TableCell>
+                    <TableCell>{c?.phone}</TableCell>
+                    <TableCell>{c?.address}</TableCell>
                     <TableCell>
-                      <Chip label={c.connection_status} color={c.connection_status === 'CONNECTED' ? 'success' : 'error'} size="small" />
+                      <Chip label={c?.connection_status || 'DISCONNECTED'} color={c?.connection_status === 'CONNECTED' ? 'success' : 'error'} size="small" />
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>
-                      ${parseFloat(c.balance).toFixed(2)}
+                      ${parseFloat(c?.balance ?? 0).toFixed(2)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -325,16 +330,16 @@ const StaffDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {meters.map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell>{m.id}</TableCell>
-                    <TableCell><strong>{m.meter_number}</strong></TableCell>
+                {(Array.isArray(meters) ? meters : []).map((m) => (
+                  <TableRow key={m?.id}>
+                    <TableCell>{m?.id}</TableCell>
+                    <TableCell><strong>{m?.meter_number}</strong></TableCell>
                     <TableCell>
-                      <Chip label={m.status} color={m.status === 'ACTIVE' ? 'success' : m.status === 'TAMPERED' ? 'error' : 'default'} size="small" />
+                      <Chip label={m?.status || 'INACTIVE'} color={m?.status === 'ACTIVE' ? 'success' : m?.status === 'TAMPERED' ? 'error' : 'default'} size="small" />
                     </TableCell>
-                    <TableCell>{m.installation_date || 'N/A'}</TableCell>
-                    <TableCell>{m.consumer ? m.consumer.consumer_number : 'Unassigned'}</TableCell>
-                    <TableCell>{m.consumer && m.consumer.user ? m.consumer.user.name : '-'}</TableCell>
+                    <TableCell>{m?.installation_date || 'N/A'}</TableCell>
+                    <TableCell>{m?.consumer ? m.consumer.consumer_number : 'Unassigned'}</TableCell>
+                    <TableCell>{m?.consumer && m.consumer.user ? m.consumer.user.name : '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -366,17 +371,17 @@ const StaffDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {bills.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell>{b.id}</TableCell>
-                    <TableCell><strong>{b.consumer ? b.consumer.consumer_number : 'N/A'}</strong></TableCell>
-                    <TableCell>{b.consumer && b.consumer.user ? b.consumer.user.name : 'N/A'}</TableCell>
-                    <TableCell>{b.billing_month}</TableCell>
-                    <TableCell>{parseFloat(b.units_used).toFixed(2)} kWh</TableCell>
-                    <TableCell>${(parseFloat(b.amount) / (parseFloat(b.units_used) || 1)).toFixed(2)}</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>${parseFloat(b.amount).toFixed(2)}</TableCell>
+                {(Array.isArray(bills) ? bills : []).map((b) => (
+                  <TableRow key={b?.id}>
+                    <TableCell>{b?.id}</TableCell>
+                    <TableCell><strong>{b?.consumer ? b.consumer.consumer_number : 'N/A'}</strong></TableCell>
+                    <TableCell>{b?.consumer && b.consumer.user ? b.consumer.user.name : 'N/A'}</TableCell>
+                    <TableCell>{b?.billing_month}</TableCell>
+                    <TableCell>{parseFloat(b?.units_used ?? 0).toFixed(2)} kWh</TableCell>
+                    <TableCell>${((parseFloat(b?.amount ?? 0)) / (parseFloat(b?.units_used ?? 0) || 1)).toFixed(2)}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>${parseFloat(b?.amount ?? 0).toFixed(2)}</TableCell>
                     <TableCell>
-                      <Chip label={b.status} color="success" size="small" sx={{ fontWeight: 'bold' }} />
+                      <Chip label={b?.status || 'PENDING'} color="success" size="small" sx={{ fontWeight: 'bold' }} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -406,14 +411,14 @@ const StaffDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {recharges.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.id}</TableCell>
-                    <TableCell><strong>{r.consumer ? r.consumer.consumer_number : 'N/A'}</strong></TableCell>
-                    <TableCell>{r.consumer && r.consumer.user ? r.consumer.user.name : 'N/A'}</TableCell>
-                    <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
+                {(Array.isArray(recharges) ? recharges : []).map((r) => (
+                  <TableRow key={r?.id}>
+                    <TableCell>{r?.id}</TableCell>
+                    <TableCell><strong>{r?.consumer ? r.consumer.consumer_number : 'N/A'}</strong></TableCell>
+                    <TableCell>{r?.consumer && r.consumer.user ? r.consumer.user.name : 'N/A'}</TableCell>
+                    <TableCell>{r?.created_at ? new Date(r.created_at).toLocaleString() : '-'}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold', color: '#26C6DA' }}>
-                      ${parseFloat(r.amount).toFixed(2)}
+                      ${parseFloat(r?.amount ?? 0).toFixed(2)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -470,9 +475,9 @@ const StaffDashboard = () => {
             onChange={(e) => setAssignMeterData({ ...assignMeterData, consumerId: e.target.value })}
             fullWidth
           >
-            {consumers.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.consumer_number} - {c.user?.name}
+            {(Array.isArray(consumers) ? consumers : []).map((c) => (
+              <MenuItem key={c?.id} value={c?.id}>
+                {c?.consumer_number} - {c?.user?.name || ''}
               </MenuItem>
             ))}
           </TextField>
@@ -483,9 +488,9 @@ const StaffDashboard = () => {
             onChange={(e) => setAssignMeterData({ ...assignMeterData, meterId: e.target.value })}
             fullWidth
           >
-            {meters.filter(m => !m.consumer_id).map((m) => (
-              <MenuItem key={m.id} value={m.id}>
-                {m.meter_number} (Unassigned)
+            {(Array.isArray(meters) ? meters : []).filter(m => !m?.consumer_id).map((m) => (
+              <MenuItem key={m?.id} value={m?.id}>
+                {m?.meter_number} (Unassigned)
               </MenuItem>
             ))}
           </TextField>
@@ -517,9 +522,9 @@ const StaffDashboard = () => {
             onChange={(e) => setNewReading({ ...newReading, meterId: e.target.value })}
             fullWidth
           >
-            {meters.filter(m => m.consumer_id && m.status === 'ACTIVE').map((m) => (
-              <MenuItem key={m.id} value={m.id}>
-                {m.meter_number} - {m.consumer ? m.consumer.consumer_number : 'Unassigned'}
+            {(Array.isArray(meters) ? meters : []).filter(m => m?.consumer_id && m?.status === 'ACTIVE').map((m) => (
+              <MenuItem key={m?.id} value={m?.id}>
+                {m?.meter_number} - {m?.consumer ? m.consumer.consumer_number : 'Unassigned'}
               </MenuItem>
             ))}
           </TextField>
@@ -550,9 +555,9 @@ const StaffDashboard = () => {
             onChange={(e) => setNewBillData({ ...newBillData, consumerId: e.target.value })}
             fullWidth
           >
-            {consumers.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.consumer_number} - {c.user?.name}
+            {(Array.isArray(consumers) ? consumers : []).map((c) => (
+              <MenuItem key={c?.id} value={c?.id}>
+                {c?.consumer_number} - {c?.user?.name || ''}
               </MenuItem>
             ))}
           </TextField>
@@ -583,9 +588,9 @@ const StaffDashboard = () => {
             onChange={(e) => setNewRechargeData({ ...newRechargeData, consumerId: e.target.value })}
             fullWidth
           >
-            {consumers.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.consumer_number} - {c.user?.name}
+            {(Array.isArray(consumers) ? consumers : []).map((c) => (
+              <MenuItem key={c?.id} value={c?.id}>
+                {c?.consumer_number} - {c?.user?.name || ''}
               </MenuItem>
             ))}
           </TextField>

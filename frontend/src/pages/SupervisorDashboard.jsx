@@ -54,18 +54,22 @@ const SupervisorDashboard = () => {
     try {
       // Fetch inspections
       const insRes = await alertApi.get('/inspections');
-      setInspections(insRes.data || []);
+      console.log('[DEBUG] SupervisorDashboard Inspections Response:', insRes.data);
+      setInspections(Array.isArray(insRes.data) ? insRes.data : []);
 
       // Fetch users to filter STAFF & SUPERVISORS
       const usersRes = await authApi.get('/users');
-      const filteredStaff = (usersRes.data || []).filter(u => u.role === 'STAFF' || u.role === 'SUPERVISOR');
+      console.log('[DEBUG] SupervisorDashboard Users Response:', usersRes.data);
+      const userData = Array.isArray(usersRes.data) ? usersRes.data : [];
+      const filteredStaff = userData.filter(u => u?.role === 'STAFF' || u?.role === 'SUPERVISOR');
       setStaffList(filteredStaff);
 
       // Fetch meters to check tamper cases
       const meterRes = await meterApi.get('/meters');
-      setMeters(meterRes.data || []);
+      console.log('[DEBUG] SupervisorDashboard Meters Response:', meterRes.data);
+      setMeters(Array.isArray(meterRes.data) ? meterRes.data : []);
     } catch (err) {
-      console.error(err);
+      console.error('[ERROR] SupervisorDashboard fetchData error:', err);
       setError('Failed to fetch supervisor portal records.');
     } finally {
       setLoading(false);
@@ -104,22 +108,26 @@ const SupervisorDashboard = () => {
   };
 
   // Compile statistics
-  const tamperedMeters = meters.filter(m => m.status === 'TAMPERED');
-  const pendingInspections = inspections.filter(i => i.status === 'PENDING');
-  const completedInspections = inspections.filter(i => i.status === 'COMPLETED');
+  const safeMeters = Array.isArray(meters) ? meters : [];
+  const safeInspections = Array.isArray(inspections) ? inspections : [];
+  const safeStaffList = Array.isArray(staffList) ? staffList : [];
+
+  const tamperedMeters = safeMeters.filter(m => m?.status === 'TAMPERED');
+  const pendingInspections = safeInspections.filter(i => i?.status === 'PENDING');
+  const completedInspections = safeInspections.filter(i => i?.status === 'COMPLETED');
   
   // Chart Data: Inspection Status Breakdown
   const inspectionPieData = [
     { name: 'Pending', value: pendingInspections.length, color: '#FFB74D' },
     { name: 'Completed', value: completedInspections.length, color: '#00B7C2' },
-    { name: 'Cancelled', value: inspections.filter(i => i.status === 'CANCELLED').length, color: '#ef5350' }
+    { name: 'Cancelled', value: safeInspections.filter(i => i?.status === 'CANCELLED').length, color: '#ef5350' }
   ].filter(item => item.value > 0);
 
   // Chart Data: Staff Workload (Pending inspections count per staff member)
-  const staffWorkloadData = staffList.map(s => {
-    const pendingCount = inspections.filter(i => i.assigned_to === s.id && i.status === 'PENDING').length;
+  const staffWorkloadData = safeStaffList.map(s => {
+    const pendingCount = safeInspections.filter(i => i?.assigned_to === s?.id && i?.status === 'PENDING').length;
     return {
-      name: s.name,
+      name: s?.name || 'Unknown',
       'Pending Tasks': pendingCount
     };
   });
@@ -284,22 +292,22 @@ const SupervisorDashboard = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {inspections.map((i) => (
+                    {safeInspections.map((i) => (
                       <TableRow key={i.id}>
                         <TableCell>{i.id}</TableCell>
-                        <TableCell><strong>{i.consumer ? i.consumer.consumer_number : 'N/A'}</strong></TableCell>
-                        <TableCell>{i.consumer ? i.consumer.address : '-'}</TableCell>
-                        <TableCell>{i.reason}</TableCell>
+                        <TableCell><strong>{i?.consumer ? i.consumer.consumer_number : 'N/A'}</strong></TableCell>
+                        <TableCell>{i?.consumer ? i.consumer.address : '-'}</TableCell>
+                        <TableCell>{i?.reason}</TableCell>
                         <TableCell>
                           <Chip
-                            label={i.status}
-                            color={i.status === 'COMPLETED' ? 'success' : i.status === 'PENDING' ? 'warning' : 'error'}
+                            label={i?.status}
+                            color={i?.status === 'COMPLETED' ? 'success' : i?.status === 'PENDING' ? 'warning' : 'error'}
                             size="small"
                           />
                         </TableCell>
                         <TableCell>
-                          {i.assignedUser ? (
-                            <Chip avatar={<Avatar>{i.assignedUser.name[0]}</Avatar>} label={i.assignedUser.name} variant="outlined" size="small" />
+                          {i?.assignedUser && i.assignedUser.name ? (
+                            <Chip avatar={<Avatar>{(i.assignedUser.name || ' ')[0]}</Avatar>} label={i.assignedUser.name} variant="outlined" size="small" />
                           ) : (
                             <span style={{ color: '#ef5350', fontSize: '12px' }}>Unassigned</span>
                           )}
@@ -336,9 +344,9 @@ const SupervisorDashboard = () => {
             fullWidth
           >
             <MenuItem value=""><em>Unassigned</em></MenuItem>
-            {staffList.map((s) => (
-              <MenuItem key={s.id} value={s.id}>
-                {s.name} ({s.role})
+            {safeStaffList.map((s) => (
+              <MenuItem key={s?.id} value={s?.id}>
+                {s?.name || 'Unknown'} ({s?.role || 'STAFF'})
               </MenuItem>
             ))}
           </TextField>

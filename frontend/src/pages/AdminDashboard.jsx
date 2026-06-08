@@ -23,7 +23,8 @@ import {
   MenuItem,
   Chip,
   Tabs,
-  Tab
+  Tab,
+  Divider
 } from '@mui/material';
 import {
   AdminPanelSettings as AdminIcon,
@@ -60,18 +61,22 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       const uRes = await authApi.get('/users');
-      setUsers(uRes.data || []);
+      console.log('[DEBUG] AdminDashboard Users Response:', uRes.data);
+      setUsers(Array.isArray(uRes.data) ? uRes.data : []);
 
       const tRes = await billingApi.get('/tariffs');
-      setTariffs(tRes.data || []);
+      console.log('[DEBUG] AdminDashboard Tariffs Response:', tRes.data);
+      setTariffs(Array.isArray(tRes.data) ? tRes.data : []);
 
       const cRes = await consumerApi.get('/consumers');
-      setConsumers(cRes.data || []);
+      console.log('[DEBUG] AdminDashboard Consumers Response:', cRes.data);
+      setConsumers(Array.isArray(cRes.data) ? cRes.data : []);
 
       const mRes = await meterApi.get('/meters');
-      setMeters(mRes.data || []);
+      console.log('[DEBUG] AdminDashboard Meters Response:', mRes.data);
+      setMeters(Array.isArray(mRes.data) ? mRes.data : []);
     } catch (err) {
-      console.error(err);
+      console.error('[ERROR] AdminDashboard fetchData error:', err);
       setError('Error fetching administrative records.');
     } finally {
       setLoading(false);
@@ -168,10 +173,11 @@ const AdminDashboard = () => {
   };
 
   // Statistics Data
-  const adminCount = users.filter(u => u.role === 'ADMIN').length;
-  const supervisorCount = users.filter(u => u.role === 'SUPERVISOR').length;
-  const staffCount = users.filter(u => u.role === 'STAFF').length;
-  const consumerCountData = users.filter(u => u.role === 'CONSUMER').length;
+  const safeUsers = Array.isArray(users) ? users : [];
+  const adminCount = safeUsers.filter(u => u?.role === 'ADMIN').length;
+  const supervisorCount = safeUsers.filter(u => u?.role === 'SUPERVISOR').length;
+  const staffCount = safeUsers.filter(u => u?.role === 'STAFF').length;
+  const consumerCountData = safeUsers.filter(u => u?.role === 'CONSUMER').length;
 
   const usersRoleChartData = [
     { name: 'Admin', count: adminCount },
@@ -293,7 +299,7 @@ const AdminDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {users.map((u) => (
+                {(Array.isArray(users) ? users : []).map((u) => (
                   <TableRow key={u.id}>
                     <TableCell>{u.id}</TableCell>
                     <TableCell><strong>{u.name}</strong></TableCell>
@@ -338,7 +344,7 @@ const AdminDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {tariffs.map((t) => (
+                {(Array.isArray(tariffs) ? tariffs : []).map((t) => (
                   <TableRow key={t.id}>
                     <TableCell>{t.id}</TableCell>
                     <TableCell><strong>{t.tariff_name}</strong></TableCell>

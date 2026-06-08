@@ -215,7 +215,7 @@ const ConsumerDashboard = () => {
     }
   };
 
-  if (loading || !profile) {
+  if (loading || !profile || !profile.id) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress color="primary" />
@@ -227,7 +227,7 @@ const ConsumerDashboard = () => {
     <Grid container spacing={3}>
       {/* 1. Statistics Cards */}
       <Grid item xs={12} md={4}>
-        <Card sx={{ height: '100%', borderLeft: `6px solid ${profile.connection_status === 'CONNECTED' ? '#00B7C2' : '#d32f2f'}` }}>
+        <Card sx={{ height: '100%', borderLeft: `6px solid ${(profile?.connection_status || 'DISCONNECTED') === 'CONNECTED' ? '#00B7C2' : '#d32f2f'}` }}>
           <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle2" color="textSecondary" sx={{ textTransform: 'uppercase', fontWeight: 600 }}>
@@ -236,13 +236,13 @@ const ConsumerDashboard = () => {
               <WalletIcon sx={{ color: '#00B7C2', fontSize: 28 }} />
             </Box>
             <Typography variant="h3" sx={{ fontWeight: 800, mb: 1, fontFamily: 'Outfit' }}>
-              ${parseFloat(profile.balance).toFixed(2)}
+              ${parseFloat(profile?.balance ?? 0).toFixed(2)}
             </Typography>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
               <Chip
-                icon={profile.connection_status === 'CONNECTED' ? <ConnectedIcon /> : <DisconnectedIcon />}
-                label={profile.connection_status}
-                color={profile.connection_status === 'CONNECTED' ? 'success' : 'error'}
+                icon={(profile?.connection_status || 'DISCONNECTED') === 'CONNECTED' ? <ConnectedIcon /> : <DisconnectedIcon />}
+                label={profile?.connection_status || 'DISCONNECTED'}
+                color={(profile?.connection_status || 'DISCONNECTED') === 'CONNECTED' ? 'success' : 'error'}
                 size="small"
                 sx={{ fontWeight: 'bold' }}
               />
@@ -268,22 +268,22 @@ const ConsumerDashboard = () => {
               </Typography>
               <MeterIcon sx={{ color: '#00B7C2', fontSize: 28 }} />
             </Box>
-            {meters.length === 0 ? (
+            {!Array.isArray(meters) || meters.length === 0 ? (
               <Typography variant="body1" sx={{ color: '#B0BEC5', mt: 2 }}>No meter assigned yet.</Typography>
             ) : (
               meters.map(m => (
-                <Box key={m.id} sx={{ mb: 1.5, p: 1.5, borderRadius: 2, border: '1px dashed rgba(0, 183, 194, 0.2)' }}>
+                <Box key={m?.id} sx={{ mb: 1.5, p: 1.5, borderRadius: 2, border: '1px dashed rgba(0, 183, 194, 0.2)' }}>
                   <Typography variant="subtitle1" color="secondary" sx={{ fontWeight: 700 }}>
-                    #{m.meter_number}
+                    #{m?.meter_number}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
                     Status:{' '}
-                    <span style={{ color: m.status === 'ACTIVE' ? '#2e7d32' : '#d32f2f', fontWeight: 'bold' }}>
-                      {m.status}
+                    <span style={{ color: m?.status === 'ACTIVE' ? '#2e7d32' : '#d32f2f', fontWeight: 'bold' }}>
+                      {m?.status || 'INACTIVE'}
                     </span>
                   </Typography>
                   <Typography variant="caption" color="textSecondary">
-                    Assigned: {m.installation_date || 'N/A'}
+                    Assigned: {m?.installation_date || 'N/A'}
                   </Typography>
                 </Box>
               ))
@@ -300,7 +300,7 @@ const ConsumerDashboard = () => {
                 Profile & Details
               </Typography>
               <Typography variant="caption" color="secondary" sx={{ fontWeight: 700 }}>
-                #{profile.consumer_number}
+                #{profile?.consumer_number || 'N/A'}
               </Typography>
             </Box>
             <Box component="form" onSubmit={handleUpdateProfile} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
@@ -391,18 +391,18 @@ const ConsumerDashboard = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {bills.map((b) => (
-                      <TableRow key={b.id}>
-                        <TableCell><strong>{b.billing_month}</strong></TableCell>
-                        <TableCell>{parseFloat(b.units_used).toFixed(2)} kWh</TableCell>
-                        <TableCell>${parseFloat(b.amount).toFixed(2)}</TableCell>
+                    {(Array.isArray(bills) ? bills : []).map((b) => (
+                      <TableRow key={b?.id}>
+                        <TableCell><strong>{b?.billing_month}</strong></TableCell>
+                        <TableCell>{parseFloat(b?.units_used ?? 0).toFixed(2)} kWh</TableCell>
+                        <TableCell>${parseFloat(b?.amount ?? 0).toFixed(2)}</TableCell>
                         <TableCell>
-                          <Chip label={b.status} color="success" size="small" sx={{ fontWeight: 'bold' }} />
+                          <Chip label={b?.status || 'PENDING'} color="success" size="small" sx={{ fontWeight: 'bold' }} />
                         </TableCell>
                         <TableCell align="right">
                           <IconButton
                             color="secondary"
-                            onClick={() => handleBillDownload(b.id, b.pdf_path)}
+                            onClick={() => handleBillDownload(b?.id, b?.pdf_path)}
                           >
                             <DownloadIcon />
                           </IconButton>
@@ -427,16 +427,16 @@ const ConsumerDashboard = () => {
               <Typography variant="body2" sx={{ color: '#B0BEC5', py: 2 }}>No recharge logs found.</Typography>
             ) : (
               <List>
-                {recharges.map((r) => (
-                  <React.Fragment key={r.id}>
+                {(Array.isArray(recharges) ? recharges : []).map((r) => (
+                  <React.Fragment key={r?.id}>
                     <ListItem sx={{ py: 1, px: 0 }}>
                       <ListItemText
                         primary={
                           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                            + ${parseFloat(r.amount).toFixed(2)} Balance Added
+                            + ${parseFloat(r?.amount ?? 0).toFixed(2)} Balance Added
                           </Typography>
                         }
-                        secondary={new Date(r.created_at).toLocaleString()}
+                        secondary={r?.created_at ? new Date(r.created_at).toLocaleString() : '-'}
                       />
                       <Chip label="Success" color="success" size="small" variant="outlined" />
                     </ListItem>
