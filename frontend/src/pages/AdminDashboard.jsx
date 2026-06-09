@@ -30,7 +30,6 @@ import {
   AdminPanelSettings as AdminIcon,
   People as UsersIcon,
   AttachMoney as TariffsIcon,
-  Settings as SettingsIcon,
   Dashboard as AnalyticsIcon,
   Add as AddIcon
 } from '@mui/icons-material';
@@ -197,7 +196,6 @@ const AdminDashboard = () => {
           <Tab label="Analytics" icon={<AnalyticsIcon />} iconPosition="start" />
           <Tab label="User Accounts" icon={<UsersIcon />} iconPosition="start" />
           <Tab label="Tariff Rates" icon={<TariffsIcon />} iconPosition="start" />
-          <Tab label="System Settings" icon={<SettingsIcon />} iconPosition="start" />
         </Tabs>
       </Box>
 
@@ -361,60 +359,7 @@ const AdminDashboard = () => {
         </Box>
       )}
 
-      {/* 4. SYSTEM SETTINGS PANEL */}
-      {activeTab === 3 && (
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, color: '#26C6DA', fontFamily: 'Outfit' }}>
-                  Microservices Ports Config
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Auth Microservice:</Typography>
-                    <Chip label="Port 3001" variant="outlined" size="small" color="primary" />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Consumer Microservice:</Typography>
-                    <Chip label="Port 3002" variant="outlined" size="small" color="primary" />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Meter Microservice:</Typography>
-                    <Chip label="Port 3003" variant="outlined" size="small" color="primary" />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Billing Microservice:</Typography>
-                    <Chip label="Port 3004" variant="outlined" size="small" color="primary" />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Alert Microservice:</Typography>
-                    <Chip label="Port 3005" variant="outlined" size="small" color="primary" />
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, color: '#26C6DA', fontFamily: 'Outfit' }}>
-                  System Information
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Typography variant="body2"><strong>OS Deployment Target:</strong> Ubuntu 22.04 LTS (EC2)</Typography>
-                  <Typography variant="body2"><strong>Engine Runtime:</strong> Node.js v18+</Typography>
-                  <Typography variant="body2"><strong>Primary Relational DB:</strong> MySQL Community Server</Typography>
-                  <Typography variant="body2"><strong>Process Monitor:</strong> PM2 Cluster Mode</Typography>
-                  <Typography variant="body2"><strong>Proxy Server:</strong> Nginx Web Server</Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
+
 
       {/* DIALOGS */}
 
