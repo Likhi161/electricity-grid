@@ -5,7 +5,7 @@
 # 1. External ALB Security Group (Public Web Access)
 resource "aws_security_group" "alb_sg" {
   name        = "smartgrid-alb-sg"
-  description = "Allows public HTTP traffic to the External ALB"
+  description = "Allows public HTTP traffic to the ALB"
   vpc_id      = aws_vpc.smartgrid_vpc.id
 
   ingress {
