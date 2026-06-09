@@ -31,7 +31,11 @@ import {
   People as UsersIcon,
   AttachMoney as TariffsIcon,
   Dashboard as AnalyticsIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  OfflineBolt as MeterIcon,
+  Receipt as BillIcon,
+  AccountBox as ConsumerIcon
 } from '@mui/icons-material';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -41,6 +45,7 @@ const AdminDashboard = () => {
   const [tariffs, setTariffs] = useState([]);
   const [consumers, setConsumers] = useState([]);
   const [meters, setMeters] = useState([]);
+  const [bills, setBills] = useState([]);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,30 +55,31 @@ const AdminDashboard = () => {
   const [openRegisterUser, setOpenRegisterUser] = useState(false);
   const [openCreateTariff, setOpenCreateTariff] = useState(false);
   const [openEditUser, setOpenEditUser] = useState(false);
+  const [openProvisionMeter, setOpenProvisionMeter] = useState(false);
 
   // Form Inputs
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'STAFF' });
   const [newTariff, setNewTariff] = useState({ tariff_name: '', rate_per_unit: '', date: '' });
   const [editUserData, setEditUserData] = useState({ id: '', name: '', email: '', password: '', status: 'ACTIVE' });
+  const [newMeterNumber, setNewMeterNumber] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const uRes = await authApi.get('/auth/users');
-      console.log('[DEBUG] AdminDashboard Users Response:', uRes.data);
       setUsers(Array.isArray(uRes.data) ? uRes.data : []);
 
       const tRes = await billingApi.get('/tariffs');
-      console.log('[DEBUG] AdminDashboard Tariffs Response:', tRes.data);
       setTariffs(Array.isArray(tRes.data) ? tRes.data : []);
 
       const cRes = await consumerApi.get('/consumers');
-      console.log('[DEBUG] AdminDashboard Consumers Response:', cRes.data);
       setConsumers(Array.isArray(cRes.data) ? cRes.data : []);
 
       const mRes = await meterApi.get('/meters');
-      console.log('[DEBUG] AdminDashboard Meters Response:', mRes.data);
       setMeters(Array.isArray(mRes.data) ? mRes.data : []);
+
+      const bRes = await billingApi.get('/bills');
+      setBills(Array.isArray(bRes.data) ? bRes.data : []);
     } catch (err) {
       console.error('[ERROR] AdminDashboard fetchData error:', err);
       setError('Error fetching administrative records.');
@@ -171,6 +177,72 @@ const AdminDashboard = () => {
     }
   };
 
+  // Provision New Meter
+  const handleProvisionMeter = async () => {
+    if (!newMeterNumber) {
+      setError('Meter number is required.');
+      return;
+    }
+    setError('');
+    try {
+      await meterApi.post('/meters', { meter_number: newMeterNumber });
+      setSuccess('Smart Meter provisioned successfully!');
+      setNewMeterNumber('');
+      fetchData();
+      setTimeout(() => {
+        setOpenProvisionMeter(false);
+        setSuccess('');
+      }, 1500);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to provision meter.');
+    }
+  };
+
+  // Delete Consumer
+  const handleDeleteConsumer = async (id) => {
+    if (window.confirm("Are you sure you want to permanently delete this consumer profile and their login user account?")) {
+      setError('');
+      setSuccess('');
+      try {
+        await consumerApi.delete(`/consumers/${id}`);
+        setSuccess('Consumer profile deleted successfully.');
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete consumer.');
+      }
+    }
+  };
+
+  // Delete Meter
+  const handleDeleteMeter = async (id) => {
+    if (window.confirm("Are you sure you want to permanently delete this smart meter and its reading history?")) {
+      setError('');
+      setSuccess('');
+      try {
+        await meterApi.delete(`/meters/${id}`);
+        setSuccess('Smart meter deleted successfully.');
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete meter.');
+      }
+    }
+  };
+
+  // Delete Bill
+  const handleDeleteBill = async (id) => {
+    if (window.confirm("Are you sure you want to delete this bill? This will also remove the statement HTML file from S3 bucket.")) {
+      setError('');
+      setSuccess('');
+      try {
+        await billingApi.delete(`/bills/${id}`);
+        setSuccess('Bill deleted successfully.');
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete bill.');
+      }
+    }
+  };
+
   // Statistics Data
   const safeUsers = Array.isArray(users) ? users : [];
   const adminCount = safeUsers.filter(u => u?.role === 'ADMIN').length;
@@ -191,15 +263,21 @@ const AdminDashboard = () => {
         Super Admin Control Panel
       </Typography>
 
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
+
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange} textColor="secondary" indicatorColor="secondary">
           <Tab label="Analytics" icon={<AnalyticsIcon />} iconPosition="start" />
           <Tab label="User Accounts" icon={<UsersIcon />} iconPosition="start" />
+          <Tab label="Consumers" icon={<ConsumerIcon />} iconPosition="start" />
+          <Tab label="Smart Meters" icon={<MeterIcon />} iconPosition="start" />
+          <Tab label="Bills" icon={<BillIcon />} iconPosition="start" />
           <Tab label="Tariff Rates" icon={<TariffsIcon />} iconPosition="start" />
         </Tabs>
       </Box>
 
-      {/* 1. ANALYTICS PANEL */}
+      {/* 0. ANALYTICS PANEL */}
       {activeTab === 0 && (
         <Grid container spacing={3}>
           <Grid item xs={12} sm={6} md={3}>
@@ -275,7 +353,7 @@ const AdminDashboard = () => {
         </Grid>
       )}
 
-      {/* 2. USER ACCOUNTS PANEL */}
+      {/* 1. USER ACCOUNTS PANEL */}
       {activeTab === 1 && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
@@ -322,8 +400,137 @@ const AdminDashboard = () => {
         </Box>
       )}
 
-      {/* 3. TARIFF PANEL */}
+      {/* 2. CONSUMERS PANEL */}
       {activeTab === 2 && (
+        <Box>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Consumer Number</TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Address</TableCell>
+                  <TableCell>Balance</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(Array.isArray(consumers) ? consumers : []).map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>{c.id}</TableCell>
+                    <TableCell><strong>{c.consumer_number}</strong></TableCell>
+                    <TableCell>{c.user?.name}</TableCell>
+                    <TableCell>{c.user?.email}</TableCell>
+                    <TableCell>{c.phone}</TableCell>
+                    <TableCell>{c.address}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: '#00B7C2' }}>₹{parseFloat(c.balance).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Chip label={c.connection_status} color={c.connection_status === 'CONNECTED' ? 'success' : 'error'} size="small" />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteConsumer(c.id)}>
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      )}
+
+      {/* 3. SMART METERS PANEL */}
+      {activeTab === 3 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={() => setOpenProvisionMeter(true)}>
+              Provision Smart Meter
+            </Button>
+          </Box>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Meter Number</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Consumer ID</TableCell>
+                  <TableCell>Installation Date</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(Array.isArray(meters) ? meters : []).map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>{m.id}</TableCell>
+                    <TableCell><strong>{m.meter_number}</strong></TableCell>
+                    <TableCell>
+                      <Chip label={m.status} color={m.status === 'ACTIVE' ? 'success' : m.status === 'TAMPERED' ? 'error' : 'default'} size="small" />
+                    </TableCell>
+                    <TableCell>{m.consumer_id || 'Unassigned'}</TableCell>
+                    <TableCell>{m.installation_date || 'N/A'}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteMeter(m.id)}>
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      )}
+
+      {/* 4. BILLS PANEL */}
+      {activeTab === 4 && (
+        <Box>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Consumer ID</TableCell>
+                  <TableCell>Billing Month</TableCell>
+                  <TableCell>Units Used (kWh)</TableCell>
+                  <TableCell>Amount (₹)</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Invoice Key</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(Array.isArray(bills) ? bills : []).map((b) => (
+                  <TableRow key={b.id}>
+                    <TableCell>{b.id}</TableCell>
+                    <TableCell>{b.consumer_id}</TableCell>
+                    <TableCell><strong>{b.billing_month}</strong></TableCell>
+                    <TableCell>{parseFloat(b.units_used).toFixed(2)}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: '#00B7C2' }}>₹{parseFloat(b.amount).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Chip label={b.status} color={b.status === 'PAID' ? 'success' : 'default'} size="small" />
+                    </TableCell>
+                    <TableCell sx={{ fontSize: '12px', fontFamily: 'monospace' }}>{b.pdf_path}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteBill(b.id)}>
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      )}
+
+      {/* 5. TARIFF PANEL */}
+      {activeTab === 5 && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
             <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={() => setOpenCreateTariff(true)}>
@@ -359,16 +566,12 @@ const AdminDashboard = () => {
         </Box>
       )}
 
-
-
       {/* DIALOGS */}
 
       {/* 1. Register User Dialog */}
       <Dialog open={openRegisterUser} onClose={() => setOpenRegisterUser(false)}>
         <DialogTitle sx={{ backgroundColor: '#102733' }}>Create System User Account</DialogTitle>
         <DialogContent sx={{ backgroundColor: '#102733', pt: 2, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 340 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
           <TextField label="User Full Name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} fullWidth />
           <TextField label="Email Address" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} fullWidth />
           <TextField label="Secure Password" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} fullWidth />
@@ -394,8 +597,6 @@ const AdminDashboard = () => {
       <Dialog open={openEditUser} onClose={() => setOpenEditUser(false)}>
         <DialogTitle sx={{ backgroundColor: '#102733' }}>Modify User Settings</DialogTitle>
         <DialogContent sx={{ backgroundColor: '#102733', pt: 2, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 340 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
           <TextField label="User Full Name" value={editUserData.name} onChange={(e) => setEditUserData({ ...editUserData, name: e.target.value })} fullWidth />
           <TextField label="Email Address" value={editUserData.email} onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })} fullWidth />
           <TextField label="New Password (Leave blank to keep current)" type="password" value={editUserData.password} onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })} fullWidth />
@@ -420,8 +621,6 @@ const AdminDashboard = () => {
       <Dialog open={openCreateTariff} onClose={() => setOpenCreateTariff(false)}>
         <DialogTitle sx={{ backgroundColor: '#102733' }}>Configure Tariff Plan</DialogTitle>
         <DialogContent sx={{ backgroundColor: '#102733', pt: 2, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 340 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          {success && <Alert severity="success">{success}</Alert>}
           <TextField label="Tariff Name" placeholder="e.g. Standard Peak Tariff" value={newTariff.tariff_name} onChange={(e) => setNewTariff({ ...newTariff, tariff_name: e.target.value })} fullWidth />
           <TextField label="Rate (₹ per kWh)" type="number" placeholder="e.g. 0.18" value={newTariff.rate_per_unit} onChange={(e) => setNewTariff({ ...newTariff, rate_per_unit: e.target.value })} fullWidth />
           <TextField
@@ -436,6 +635,18 @@ const AdminDashboard = () => {
         <DialogActions sx={{ backgroundColor: '#102733' }}>
           <Button onClick={() => setOpenCreateTariff(false)} color="inherit">Cancel</Button>
           <Button onClick={handleCreateTariff} color="secondary" variant="contained">Configure</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 4. Provision Meter Dialog */}
+      <Dialog open={openProvisionMeter} onClose={() => setOpenProvisionMeter(false)}>
+        <DialogTitle sx={{ backgroundColor: '#102733' }}>Provision New Smart Meter</DialogTitle>
+        <DialogContent sx={{ backgroundColor: '#102733', pt: 2, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 340 }}>
+          <TextField label="Meter Serial Number" placeholder="e.g. MTR-9840294" value={newMeterNumber} onChange={(e) => setNewMeterNumber(e.target.value)} fullWidth />
+        </DialogContent>
+        <DialogActions sx={{ backgroundColor: '#102733' }}>
+          <Button onClick={() => setOpenProvisionMeter(false)} color="inherit">Cancel</Button>
+          <Button onClick={handleProvisionMeter} color="secondary" variant="contained">Provision</Button>
         </DialogActions>
       </Dialog>
     </Box>

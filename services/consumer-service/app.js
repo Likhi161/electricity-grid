@@ -195,6 +195,32 @@ app.post('/api/consumers/assign-meter', authenticate, authorize(['STAFF', 'ADMIN
   }
 });
 
+// DELETE consumer profile and user account (Admin only)
+app.delete('/api/consumers/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const consumer = await Consumer.findByPk(id);
+    if (!consumer) {
+      return res.status(404).json({ error: 'Consumer not found' });
+    }
+
+    // Unassign meters first
+    await Meter.update({ consumer_id: null, installation_date: null }, { where: { consumer_id: id } });
+
+    const userId = consumer.user_id;
+    await consumer.destroy();
+
+    if (userId) {
+      await User.destroy({ where: { id: userId } });
+    }
+
+    return res.status(200).json({ message: 'Consumer profile and user account deleted successfully' });
+  } catch (error) {
+    console.error('Delete Consumer Error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled Route Error:', err);

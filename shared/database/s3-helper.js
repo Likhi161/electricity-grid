@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const fs = require('fs');
 const path = require('path');
 
@@ -76,4 +76,28 @@ async function downloadBill(fileName, res) {
   fs.createReadStream(filePath).pipe(res);
 }
 
-module.exports = { uploadBill, downloadBill };
+async function deleteBill(fileName) {
+  if (s3Client) {
+    try {
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: fileName
+        })
+      );
+      console.log(`[S3 Helper] Successfully deleted bill ${fileName} from S3 bucket ${bucketName}`);
+      return;
+    } catch (err) {
+      console.error(`[S3 Helper] S3 DeleteObject failed for ${fileName} (${err.message}).`);
+    }
+  }
+
+  // Fallback local delete
+  const filePath = path.join(billsDir, fileName);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    console.log(`[S3 Helper] Deleted local fallback bill: ${filePath}`);
+  }
+}
+
+module.exports = { uploadBill, downloadBill, deleteBill };

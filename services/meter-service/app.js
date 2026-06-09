@@ -6,6 +6,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger');
 const { sequelize, Meter, MeterReading, Consumer, Tariff, Notification, Inspection, User } = require('../../shared/database/models');
 const { authenticate, authorize } = require('./middleware/auth');
+const { invokeLambda, publishSNS } = require('../../shared/database/aws-helpers');
 
 const app = express();
 
@@ -93,8 +94,8 @@ app.get('/api/meters/:id', authenticate, async (req, res) => {
   }
 });
 
-// POST create a new meter (Staff/Admin only)
-app.post('/api/meters', authenticate, authorize(['STAFF', 'ADMIN']), async (req, res) => {
+// POST create a new meter (Staff/Supervisor/Admin only)
+app.post('/api/meters', authenticate, authorize(['STAFF', 'SUPERVISOR', 'ADMIN']), async (req, res) => {
   const { meter_number } = req.body;
 
   if (!meter_number) {
@@ -227,17 +228,34 @@ app.post('/api/meters/:id/readings', authenticate, authorize(['STAFF', 'ADMIN'])
       return res.status(400).json({ error: 'Meter is not assigned to any consumer' });
     }
 
-    // 1. Fetch latest active Tariff rate
+    // Invoke unit_calculator Lambda to process unit consumption input
+    const unitResult = await invokeLambda(
+      process.env.LAMBDA_UNIT_CALCULATOR,
+      { current_reading: parseFloat(units_consumed), previous_reading: 0 },
+      (payload) => ({ units_consumed: payload.current_reading })
+    );
+    const calculatedUnits = unitResult.units_consumed;
+
+    // 1. Fetch active Tariff and resolve rate via tariff_engine Lambda
     const tariff = await Tariff.findOne({
       order: [['effective_date', 'DESC'], ['id', 'DESC']],
       transaction
     });
     
-    // Fallback if no tariffs are configured yet
-    const rate = tariff ? parseFloat(tariff.rate_per_unit) : 0.15; 
+    const tariffResult = await invokeLambda(
+      process.env.LAMBDA_TARIFF_ENGINE,
+      { tariff_name: tariff ? tariff.tariff_name : 'Standard' },
+      (payload) => ({ rate_per_unit: tariff ? parseFloat(tariff.rate_per_unit) : 0.15 })
+    );
+    const rate = tariffResult.rate_per_unit;
 
-    // 2. Calculate Cost
-    const cost = parseFloat(units_consumed) * rate;
+    // 2. Calculate Cost via bill_generator Lambda
+    const billResult = await invokeLambda(
+      process.env.LAMBDA_BILL_GENERATOR,
+      { units: calculatedUnits, rate },
+      (payload) => ({ amount: parseFloat(payload.units) * parseFloat(payload.rate) })
+    );
+    const cost = billResult.amount;
 
     // 3. Deduct from Consumer Balance
     const consumer = meter.consumer;
@@ -246,28 +264,56 @@ app.post('/api/meters/:id/readings', authenticate, authorize(['STAFF', 'ADMIN'])
     
     consumer.balance = newBalance;
 
-    // 4. Update status and trigger alerts/disconnect
+    // 4. Update status and trigger alerts/disconnect (and publish to SNS)
     let statusMessage = 'Reading saved and balance deducted.';
     
     if (newBalance <= 0) {
       consumer.connection_status = 'DISCONNECTED';
       statusMessage = 'Reading saved. Service has been DISCONNECTED due to insufficient balance.';
       
-      // Create disconnection notification
+      // Create disconnection notification in DB
       await Notification.create({
         user_id: consumer.user_id,
         title: 'Service Disconnected',
-        message: `Your utility service was suspended because your balance dropped to $${newBalance.toFixed(2)}. Please recharge immediately to restore service.`,
+        message: `Your utility service was suspended because your balance dropped to ₹${newBalance.toFixed(2)}. Please recharge immediately to restore service.`,
         type: 'LOW_BALANCE'
       }, { transaction });
+
+      // Publish to SNS Disconnection Notice
+      const snsMsg = `
+========================================
+SMARTGRID SERVICE SUSPENSION NOTICE
+========================================
+Consumer Number: ${consumer.consumer_number}
+Current Balance: ₹${newBalance.toFixed(2)}
+Status: DISCONNECTED (Insufficient Funds)
+
+Warning: Your electricity service has been suspended. Please complete a balance recharge immediately to restore power connection.
+========================================
+`.trim();
+      await publishSNS(process.env.SNS_DISCONNECTION_ARN, snsMsg, 'Service Disconnected Alert');
     } else if (newBalance <= 15.00 && oldBalance > 15.00) {
-      // Low balance warning triggered
+      // Low balance warning triggered in DB
       await Notification.create({
         user_id: consumer.user_id,
         title: 'Low Balance Alert',
-        message: `Your balance is running low. Current balance: $${newBalance.toFixed(2)}. Please recharge soon to avoid disconnection.`,
+        message: `Your balance is running low. Current balance: ₹${newBalance.toFixed(2)}. Please recharge soon to avoid disconnection.`,
         type: 'LOW_BALANCE'
       }, { transaction });
+
+      // Publish to SNS Low Balance Topic
+      const snsMsg = `
+========================================
+SMARTGRID PREPAID BALANCE ALERT
+========================================
+Consumer Number: ${consumer.consumer_number}
+Current Balance: ₹${newBalance.toFixed(2)}
+Status: LOW BALANCE WARNING
+
+Notice: Your balance is running low. Please recharge soon to avoid automatic disconnection of your electricity service.
+========================================
+`.trim();
+      await publishSNS(process.env.SNS_LOW_BALANCE_ARN, snsMsg, 'Low Balance Alert');
     }
 
     await consumer.save({ transaction });
@@ -275,7 +321,7 @@ app.post('/api/meters/:id/readings', authenticate, authorize(['STAFF', 'ADMIN'])
     // 5. Store Meter Reading
     const reading = await MeterReading.create({
       meter_id: id,
-      units_consumed,
+      units_consumed: calculatedUnits,
       reading_date: new Date()
     }, { transaction });
 
@@ -283,7 +329,7 @@ app.post('/api/meters/:id/readings', authenticate, authorize(['STAFF', 'ADMIN'])
     return res.status(201).json({
       message: statusMessage,
       reading,
-      units: parseFloat(units_consumed),
+      units: calculatedUnits,
       rate,
       cost,
       oldBalance,
@@ -293,6 +339,26 @@ app.post('/api/meters/:id/readings', authenticate, authorize(['STAFF', 'ADMIN'])
   } catch (error) {
     await transaction.rollback();
     console.error('Submit Reading Error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE meter (Admin only)
+app.delete('/api/meters/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const meter = await Meter.findByPk(id);
+    if (!meter) {
+      return res.status(404).json({ error: 'Meter not found' });
+    }
+    
+    // Delete meter readings first to avoid constraint violation
+    await MeterReading.destroy({ where: { meter_id: id } });
+    
+    await meter.destroy();
+    return res.status(200).json({ message: 'Meter and its reading history deleted successfully' });
+  } catch (error) {
+    console.error('Delete Meter Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

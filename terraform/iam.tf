@@ -56,6 +56,27 @@ resource "aws_iam_policy" "backend_policy" {
           "kms:Encrypt"
         ]
         Resource = aws_kms_key.s3_key.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = [
+          module.lambda_unit_calculator.lambda_function_arn,
+          module.lambda_bill_generator.lambda_function_arn,
+          module.lambda_tariff_engine.lambda_function_arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = [
+          module.sns_low_balance.topic_arn,
+          module.sns_disconnection.topic_arn
+        ]
       }
     ]
   })

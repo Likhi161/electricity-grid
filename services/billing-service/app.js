@@ -19,6 +19,7 @@ app.use(morgan('dev'));
 
 // S3 helper for invoice management (with local fallback)
 const { uploadBill, downloadBill } = require('../../shared/database/s3-helper');
+const { invokeLambda } = require('../../shared/database/aws-helpers');
 
 // Custom Rate Limiter
 const rateLimitMap = new Map();
@@ -139,7 +140,7 @@ app.post('/api/recharges', authenticate, async (req, res) => {
 
     consumer.balance = newBalance;
     
-    // Automatic reconnection if balance restored above $0
+    // Automatic reconnection if balance restored above ₹0
     if (newBalance > 0 && oldStatus === 'DISCONNECTED') {
       consumer.connection_status = 'CONNECTED';
     }
@@ -157,13 +158,13 @@ app.post('/api/recharges', authenticate, async (req, res) => {
     await Notification.create({
       user_id: consumer.user_id,
       title: 'Recharge Successful',
-      message: `Your account has been recharged with $${parseFloat(amount).toFixed(2)}. Current Balance: $${newBalance.toFixed(2)}. Status: ${consumer.connection_status}.`,
+      message: `Your account has been recharged with ₹${parseFloat(amount).toFixed(2)}. Current Balance: ₹${newBalance.toFixed(2)}. Status: ${consumer.connection_status}.`,
       type: 'RECHARGE'
     }, { transaction });
 
     await transaction.commit();
     return res.status(201).json({
-      message: `Recharge of $${parseFloat(amount).toFixed(2)} completed successfully.`,
+      message: `Recharge of ₹${parseFloat(amount).toFixed(2)} completed successfully.`,
       recharge,
       newBalance,
       connectionStatus: consumer.connection_status
@@ -272,15 +273,26 @@ app.post('/api/bills/generate', authenticate, authorize(['STAFF', 'ADMIN']), asy
 
     const totalUnits = readings.reduce((sum, r) => sum + parseFloat(r.units_consumed), 0);
 
-    // 3. Find active tariff
+    // 3. Find active tariff and resolve rate via tariff_engine Lambda
     const tariff = await Tariff.findOne({
       order: [['effective_date', 'DESC'], ['id', 'DESC']],
       transaction
     });
-    const rate = tariff ? parseFloat(tariff.rate_per_unit) : 0.15;
+    
+    const tariffResult = await invokeLambda(
+      process.env.LAMBDA_TARIFF_ENGINE,
+      { tariff_name: tariff ? tariff.tariff_name : 'Standard' },
+      (payload) => ({ rate_per_unit: tariff ? parseFloat(tariff.rate_per_unit) : 0.15 })
+    );
+    const rate = tariffResult.rate_per_unit;
 
-    // 4. Calculate total bill amount
-    const amount = totalUnits * rate;
+    // 4. Calculate total bill amount via bill_generator Lambda
+    const billResult = await invokeLambda(
+      process.env.LAMBDA_BILL_GENERATOR,
+      { units: totalUnits, rate },
+      (payload) => ({ amount: parseFloat(payload.units) * parseFloat(payload.rate) })
+    );
+    const amount = billResult.amount;
 
     // 5. Build HTML file representing the receipt/bill
     const fileName = `bill_${consumer.consumer_number}_${billingMonth}.html`;
@@ -333,7 +345,7 @@ app.post('/api/bills/generate', authenticate, authorize(['STAFF', 'ADMIN']), asy
               <th>Description</th>
               <th>Meters Active</th>
               <th>Units Used (kWh)</th>
-              <th>Rate ($/kWh)</th>
+              <th>Rate (₹/kWh)</th>
               <th>Total Cost</th>
             </tr>
           </thead>
@@ -342,12 +354,12 @@ app.post('/api/bills/generate', authenticate, authorize(['STAFF', 'ADMIN']), asy
               <td>Electricity Usage</td>
               <td>${meters.length}</td>
               <td>${totalUnits.toFixed(2)}</td>
-              <td>$${rate.toFixed(2)}</td>
-              <td>$${amount.toFixed(2)}</td>
+              <td>₹${rate.toFixed(2)}</td>
+              <td>₹${amount.toFixed(2)}</td>
             </tr>
             <tr class="total-row">
               <td colspan="4" style="text-align: right;">Grand Total:</td>
-              <td>$${amount.toFixed(2)}</td>
+              <td>₹${amount.toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
@@ -377,7 +389,7 @@ app.post('/api/bills/generate', authenticate, authorize(['STAFF', 'ADMIN']), asy
     await Notification.create({
       user_id: consumer.user_id,
       title: 'New Monthly Bill Available',
-      message: `Your monthly statement for ${billingMonth} is generated. Units used: ${totalUnits.toFixed(2)} kWh. Total statement cost: $${amount.toFixed(2)}. Receipt is ready for download.`,
+      message: `Your monthly statement for ${billingMonth} is generated. Units used: ${totalUnits.toFixed(2)} kWh. Total statement cost: ₹${amount.toFixed(2)}. Receipt is ready for download.`,
       type: 'BILL'
     }, { transaction });
 
@@ -414,6 +426,29 @@ app.get('/api/bills/:id/download', authenticate, async (req, res) => {
     }
   } catch (error) {
     console.error('Download Bill Error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE bill (Admin only)
+app.delete('/api/bills/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const bill = await Bill.findByPk(id);
+    if (!bill) {
+      return res.status(404).json({ error: 'Bill not found' });
+    }
+
+    // Delete file from S3 / local fallback
+    if (bill.pdf_path) {
+      const { deleteBill } = require('../../shared/database/s3-helper');
+      await deleteBill(bill.pdf_path);
+    }
+
+    await bill.destroy();
+    return res.status(200).json({ message: 'Bill deleted successfully' });
+  } catch (error) {
+    console.error('Delete Bill Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

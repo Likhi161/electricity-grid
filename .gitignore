@@ -37,3 +37,7 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+
+# Terraform builds directory
+terraform/builds/
+
