@@ -49,6 +49,7 @@ const StaffDashboard = () => {
   const [success, setSuccess] = useState('');
 
   // Modals visibility states
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, type: '', id: null, message: '' });
   const [openRegisterConsumer, setOpenRegisterConsumer] = useState(false);
   const [openAssignMeter, setOpenAssignMeter] = useState(false);
   const [openCreateMeter, setOpenCreateMeter] = useState(false);
@@ -242,48 +243,30 @@ const StaffDashboard = () => {
     }
   };
 
-  // 7. Delete Consumer
-  const handleDeleteConsumer = async (id) => {
-    if (window.confirm("Are you sure you want to permanently delete this consumer profile and their login user account?")) {
-      setError('');
-      setSuccess('');
-      try {
+  // Delete dialog trigger helper
+  const triggerDeleteConfirm = (type, id, message) => {
+    setDeleteConfirm({ open: true, type, id, message });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { type, id } = deleteConfirm;
+    setDeleteConfirm({ open: false, type: '', id: null, message: '' });
+    setError('');
+    setSuccess('');
+    try {
+      if (type === 'consumer') {
         await consumerApi.delete(`/consumers/${id}`);
         setSuccess('Consumer profile deleted successfully.');
-        fetchData();
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to delete consumer.');
-      }
-    }
-  };
-
-  // 8. Delete Meter
-  const handleDeleteMeter = async (id) => {
-    if (window.confirm("Are you sure you want to permanently delete this smart meter and its reading history?")) {
-      setError('');
-      setSuccess('');
-      try {
+      } else if (type === 'meter') {
         await meterApi.delete(`/meters/${id}`);
         setSuccess('Smart meter deleted successfully.');
-        fetchData();
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to delete meter.');
-      }
-    }
-  };
-
-  // 9. Delete Bill
-  const handleDeleteBill = async (id) => {
-    if (window.confirm("Are you sure you want to delete this bill? This will also remove the statement HTML file from S3 bucket.")) {
-      setError('');
-      setSuccess('');
-      try {
+      } else if (type === 'bill') {
         await billingApi.delete(`/bills/${id}`);
         setSuccess('Bill deleted successfully.');
-        fetchData();
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to delete bill.');
       }
+      fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || `Failed to delete ${type}.`);
     }
   };
 
@@ -349,7 +332,7 @@ const StaffDashboard = () => {
                       ₹{parseFloat(c?.balance ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell align="right">
-                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteConsumer(c?.id)}>
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => triggerDeleteConfirm('consumer', c?.id, 'Are you sure you want to permanently delete this consumer profile and their login user account?')}>
                         Delete
                       </Button>
                     </TableCell>
@@ -397,7 +380,7 @@ const StaffDashboard = () => {
                     <TableCell>{m?.consumer ? m.consumer.consumer_number : 'Unassigned'}</TableCell>
                     <TableCell>{m?.consumer && m.consumer.user ? m.consumer.user.name : '-'}</TableCell>
                     <TableCell align="right">
-                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteMeter(m?.id)}>
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => triggerDeleteConfirm('meter', m?.id, 'Are you sure you want to permanently delete this smart meter and its reading history?')}>
                         Delete
                       </Button>
                     </TableCell>
@@ -446,7 +429,7 @@ const StaffDashboard = () => {
                       <Chip label={b?.status || 'PENDING'} color="success" size="small" sx={{ fontWeight: 'bold' }} />
                     </TableCell>
                     <TableCell align="right">
-                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteBill(b?.id)}>
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => triggerDeleteConfirm('bill', b?.id, 'Are you sure you want to delete this bill? This will also remove the statement HTML file from S3 bucket.')}>
                         Delete
                       </Button>
                     </TableCell>
@@ -672,6 +655,20 @@ const StaffDashboard = () => {
         <DialogActions sx={{ backgroundColor: '#102733' }}>
           <Button onClick={() => setOpenRecharge(false)} color="inherit">Cancel</Button>
           <Button onClick={handleRecharge} color="secondary" variant="contained">Record Payment</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirm.open} onClose={() => setDeleteConfirm({ ...deleteConfirm, open: false })}>
+        <DialogTitle sx={{ backgroundColor: '#102733', fontFamily: 'Outfit', fontWeight: 700 }}>Confirm Deletion</DialogTitle>
+        <DialogContent sx={{ backgroundColor: '#102733', minWidth: 320, pt: 1 }}>
+          <Typography variant="body1" sx={{ fontFamily: 'Outfit', color: '#B0BEC5' }}>
+            {deleteConfirm.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ backgroundColor: '#102733', pb: 2, px: 3 }}>
+          <Button onClick={() => setDeleteConfirm({ ...deleteConfirm, open: false })} color="inherit">Cancel</Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">Delete</Button>
         </DialogActions>
       </Dialog>
 
