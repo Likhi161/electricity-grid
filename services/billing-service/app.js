@@ -430,8 +430,8 @@ app.get('/api/bills/:id/download', authenticate, async (req, res) => {
   }
 });
 
-// DELETE bill (Admin only)
-app.delete('/api/bills/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
+// DELETE bill (Staff/Supervisor/Admin only)
+app.delete('/api/bills/:id', authenticate, authorize(['STAFF', 'SUPERVISOR', 'ADMIN']), async (req, res) => {
   const { id } = req.params;
   try {
     const bill = await Bill.findByPk(id);

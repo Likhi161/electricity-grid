@@ -32,7 +32,8 @@ import {
   Receipt as BillIcon,
   AccountBalanceWallet as RechargeIcon,
   AssignmentTurnedIn as AssignIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 const StaffDashboard = () => {
@@ -241,6 +242,51 @@ const StaffDashboard = () => {
     }
   };
 
+  // 7. Delete Consumer
+  const handleDeleteConsumer = async (id) => {
+    if (window.confirm("Are you sure you want to permanently delete this consumer profile and their login user account?")) {
+      setError('');
+      setSuccess('');
+      try {
+        await consumerApi.delete(`/consumers/${id}`);
+        setSuccess('Consumer profile deleted successfully.');
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete consumer.');
+      }
+    }
+  };
+
+  // 8. Delete Meter
+  const handleDeleteMeter = async (id) => {
+    if (window.confirm("Are you sure you want to permanently delete this smart meter and its reading history?")) {
+      setError('');
+      setSuccess('');
+      try {
+        await meterApi.delete(`/meters/${id}`);
+        setSuccess('Smart meter deleted successfully.');
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete meter.');
+      }
+    }
+  };
+
+  // 9. Delete Bill
+  const handleDeleteBill = async (id) => {
+    if (window.confirm("Are you sure you want to delete this bill? This will also remove the statement HTML file from S3 bucket.")) {
+      setError('');
+      setSuccess('');
+      try {
+        await billingApi.delete(`/bills/${id}`);
+        setSuccess('Bill deleted successfully.');
+        fetchData();
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete bill.');
+      }
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 4, fontFamily: 'Outfit', fontWeight: 800 }}>
@@ -281,6 +327,7 @@ const StaffDashboard = () => {
                   <TableCell>Address</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="right">Prepaid Balance</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -297,6 +344,11 @@ const StaffDashboard = () => {
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>
                       ₹{parseFloat(c?.balance ?? 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteConsumer(c?.id)}>
+                        Delete
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -327,6 +379,7 @@ const StaffDashboard = () => {
                   <TableCell>Installation Date</TableCell>
                   <TableCell>Consumer #</TableCell>
                   <TableCell>Consumer Name</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -340,6 +393,11 @@ const StaffDashboard = () => {
                     <TableCell>{m?.installation_date || 'N/A'}</TableCell>
                     <TableCell>{m?.consumer ? m.consumer.consumer_number : 'Unassigned'}</TableCell>
                     <TableCell>{m?.consumer && m.consumer.user ? m.consumer.user.name : '-'}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteMeter(m?.id)}>
+                        Delete
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -368,6 +426,7 @@ const StaffDashboard = () => {
                   <TableCell>Tariff Rate</TableCell>
                   <TableCell>Amount</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -382,6 +441,11 @@ const StaffDashboard = () => {
                     <TableCell sx={{ fontWeight: 'bold' }}>₹{parseFloat(b?.amount ?? 0).toFixed(2)}</TableCell>
                     <TableCell>
                       <Chip label={b?.status || 'PENDING'} color="success" size="small" sx={{ fontWeight: 'bold' }} />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteBill(b?.id)}>
+                        Delete
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

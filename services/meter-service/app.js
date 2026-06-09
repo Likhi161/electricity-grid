@@ -343,8 +343,8 @@ Notice: Your balance is running low. Please recharge soon to avoid automatic dis
   }
 });
 
-// DELETE meter (Admin only)
-app.delete('/api/meters/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
+// DELETE meter (Staff/Supervisor/Admin only)
+app.delete('/api/meters/:id', authenticate, authorize(['STAFF', 'SUPERVISOR', 'ADMIN']), async (req, res) => {
   const { id } = req.params;
   try {
     const meter = await Meter.findByPk(id);

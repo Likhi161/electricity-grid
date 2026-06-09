@@ -71,7 +71,13 @@ app.get('/health', (req, res) => {
 // GET all notifications (Staff/Supervisor/Admin only)
 app.get('/api/alerts', authenticate, authorize(['STAFF', 'SUPERVISOR', 'ADMIN']), async (req, res) => {
   try {
+    const { Op } = require('sequelize');
     const alerts = await Notification.findAll({
+      where: {
+        type: {
+          [Op.in]: ['TAMPER', 'INSPECTION', 'SYSTEM']
+        }
+      },
       include: [{ model: User, as: 'user', attributes: ['name', 'email'] }],
       order: [['created_at', 'DESC']]
     });

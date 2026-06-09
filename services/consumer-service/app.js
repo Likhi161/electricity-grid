@@ -195,8 +195,8 @@ app.post('/api/consumers/assign-meter', authenticate, authorize(['STAFF', 'ADMIN
   }
 });
 
-// DELETE consumer profile and user account (Admin only)
-app.delete('/api/consumers/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
+// DELETE consumer profile and user account (Staff/Supervisor/Admin only)
+app.delete('/api/consumers/:id', authenticate, authorize(['STAFF', 'SUPERVISOR', 'ADMIN']), async (req, res) => {
   const { id } = req.params;
   try {
     const consumer = await Consumer.findByPk(id);
