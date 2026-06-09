@@ -4,7 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger');
-const { Consumer, User, Meter } = require('../../shared/database/models');
+const { Consumer, User, Meter, Bill, Recharge, Inspection, Notification } = require('../../shared/database/models');
 const { authenticate, authorize } = require('./middleware/auth');
 
 const app = express();
@@ -208,6 +208,15 @@ app.delete('/api/consumers/:id', authenticate, authorize(['STAFF', 'SUPERVISOR',
     await Meter.update({ consumer_id: null, installation_date: null }, { where: { consumer_id: id } });
 
     const userId = consumer.user_id;
+
+    // Delete related child records first to avoid DB constraint failures
+    await Bill.destroy({ where: { consumer_id: id } });
+    await Recharge.destroy({ where: { consumer_id: id } });
+    await Inspection.destroy({ where: { consumer_id: id } });
+    if (userId) {
+      await Notification.destroy({ where: { user_id: userId } });
+    }
+
     await consumer.destroy();
 
     if (userId) {
