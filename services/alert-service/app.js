@@ -7,13 +7,23 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger');
 const { sequelize, Op, Notification, Inspection, User, Consumer } = require('../../shared/database/models');
 const { authenticate, authorize } = require('./middleware/auth');
+const { metricsMiddleware, metricsHandler, createServiceCounters } = require('../../shared/metrics');
 
 const app = express();
+app.locals.serviceName = 'alert-service';
 
 app.use(express.json());
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
+
+// Health & Metrics — before rate limiter
+app.get('/health',  (req, res) => res.status(200).json({ status: 'healthy', service: 'alert-service', timestamp: new Date() }));
+app.get('/healthz', (req, res) => res.status(200).json({ status: 'healthy', service: 'alert-service', timestamp: new Date() }));
+app.get('/ready',   (req, res) => res.status(200).json({ status: 'ready',   service: 'alert-service', timestamp: new Date() }));
+app.get('/metrics', metricsHandler);
+app.use(metricsMiddleware);
+const metrics = createServiceCounters('alert-service');
 
 // Custom Rate Limiter
 const rateLimitMap = new Map();
@@ -21,7 +31,8 @@ app.use((req, res, next) => {
   if (
     req.path === '/health' ||
     req.path === '/healthz' ||
-    req.path === '/ready'
+    req.path === '/ready' ||
+    req.path === '/metrics'
   ) {
     return next();
   }

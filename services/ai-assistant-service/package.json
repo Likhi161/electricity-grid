@@ -22,6 +22,7 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.11.0",
     "multer": "^2.2.0",
-    "pdf-parse": "1.1.1"
+    "pdf-parse": "1.1.1",
+    "prom-client": "^15.1.3"
   }
 }

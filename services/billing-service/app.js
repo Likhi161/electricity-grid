@@ -20,6 +20,17 @@ app.use(morgan('dev'));
 // S3 helper for invoice management (with local fallback)
 const { uploadBill, downloadBill } = require('../../shared/database/s3-helper');
 const { invokeLambda } = require('../../shared/database/aws-helpers');
+const { metricsMiddleware, metricsHandler, createServiceCounters } = require('../../shared/metrics');
+
+app.locals.serviceName = 'billing-service';
+
+// Health & Metrics — before rate limiter
+app.get('/health',  (req, res) => res.status(200).json({ status: 'healthy', service: 'billing-service', timestamp: new Date() }));
+app.get('/healthz', (req, res) => res.status(200).json({ status: 'healthy', service: 'billing-service', timestamp: new Date() }));
+app.get('/ready',   (req, res) => res.status(200).json({ status: 'ready',   service: 'billing-service', timestamp: new Date() }));
+app.get('/metrics', metricsHandler);
+app.use(metricsMiddleware);
+const metrics = createServiceCounters('billing-service');
 
 // Custom Rate Limiter
 const rateLimitMap = new Map();
@@ -27,7 +38,8 @@ app.use((req, res, next) => {
   if (
     req.path === '/health' ||
     req.path === '/healthz' ||
-    req.path === '/ready'
+    req.path === '/ready' ||
+    req.path === '/metrics'
   ) {
     return next();
   }

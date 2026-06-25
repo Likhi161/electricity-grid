@@ -16,6 +16,7 @@ RUN npm ci --only=production
 # Copy source code
 WORKDIR /app
 COPY shared/database ./shared/database
+COPY shared/metrics ./shared/metrics
 COPY services/auth-service ./services/auth-service
 
 # Stage 2: Final minimal image
@@ -24,6 +25,7 @@ WORKDIR /app
 
 # Copy built artifacts from builder
 COPY --from=builder /app/shared/database ./shared/database
+COPY --from=builder /app/shared/metrics ./shared/metrics
 COPY --from=builder /app/services/auth-service ./services/auth-service
 
 WORKDIR /app/services/auth-service

@@ -8,9 +8,11 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger');
 const { sequelize, User, Consumer } = require('../../shared/database/models');
 const { authenticate, authorize } = require('./middleware/auth');
+const { metricsMiddleware, metricsHandler, createServiceCounters } = require('../../shared/metrics');
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'smartgrid_secret';
+app.locals.serviceName = 'auth-service';
 
 // Express Middlewares
 app.use(express.json());
@@ -18,16 +20,17 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 
-// Health Check Endpoints — registered before rate limiter so probes are never throttled
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', service: 'auth-service', timestamp: new Date() });
-});
-app.get('/healthz', (req, res) => {
-  res.status(200).json({ status: 'healthy', service: 'auth-service', timestamp: new Date() });
-});
-app.get('/ready', (req, res) => {
-  res.status(200).json({ status: 'ready', service: 'auth-service', timestamp: new Date() });
-});
+// Health & Metrics endpoints — before rate limiter so they are never throttled
+app.get('/health',  (req, res) => res.status(200).json({ status: 'healthy', service: 'auth-service', timestamp: new Date() }));
+app.get('/healthz', (req, res) => res.status(200).json({ status: 'healthy', service: 'auth-service', timestamp: new Date() }));
+app.get('/ready',   (req, res) => res.status(200).json({ status: 'ready',   service: 'auth-service', timestamp: new Date() }));
+app.get('/metrics', metricsHandler);
+
+// HTTP metrics middleware — records request duration and count for all routes
+app.use(metricsMiddleware);
+
+// Business-level counters (auth login attempts, failures, token validations)
+const metrics = createServiceCounters('auth-service');
 
 // Rate Limiter — applied only to non-health routes
 // Limit is per source IP; in EKS all ALB traffic shares the proxy IP so keep
